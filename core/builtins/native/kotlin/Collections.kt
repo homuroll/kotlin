@@ -36,7 +36,7 @@ public interface Iterable<out T> {
  */
 public interface MutableIterable<out T> : Iterable<T> {
     /**
-     * Returns an iterator over the elementrs of this sequence that supports removing elements during iteration.
+     * Returns an iterator over the elements of this sequence that supports removing elements during iteration.
      */
     override fun iterator(): MutableIterator<T>
 }
@@ -62,6 +62,7 @@ public interface Collection<out E> : Iterable<E> {
      * Checks if the specified element is contained in this collection.
      */
     public operator fun contains(element: @UnsafeVariance E): Boolean
+
     override fun iterator(): Iterator<E>
 
     // Bulk Operations
@@ -131,6 +132,7 @@ public interface MutableCollection<E> : Collection<E>, MutableIterable<E> {
 public interface List<out E> : Collection<E> {
     // Query Operations
     override val size: Int
+
     override fun isEmpty(): Boolean
     override fun contains(element: @UnsafeVariance E): Boolean
     override fun iterator(): Iterator<E>
@@ -172,6 +174,8 @@ public interface List<out E> : Collection<E> {
     /**
      * Returns a view of the portion of this list between the specified [fromIndex] (inclusive) and [toIndex] (exclusive).
      * The returned list is backed by this list, so non-structural changes in the returned list are reflected in this list, and vice-versa.
+     *
+     * Structural changes in the base list makes the behavior of the view undefined.
      */
     public fun subList(fromIndex: Int, toIndex: Int): List<E>
 }
@@ -183,6 +187,7 @@ public interface List<out E> : Collection<E> {
 public interface MutableList<E> : List<E>, MutableCollection<E> {
     // Modification Operations
     override fun add(element: E): Boolean
+
     override fun remove(element: E): Boolean
 
     // Bulk Modification Operations
@@ -194,6 +199,7 @@ public interface MutableList<E> : List<E>, MutableCollection<E> {
      * @return `true` if the list was changed as the result of the operation.
      */
     public fun addAll(index: Int, elements: Collection<E>): Boolean
+
     override fun removeAll(elements: Collection<E>): Boolean
     override fun retainAll(elements: Collection<E>): Boolean
     override fun clear(): Unit
@@ -220,6 +226,7 @@ public interface MutableList<E> : List<E>, MutableCollection<E> {
 
     // List Iterators
     override fun listIterator(): MutableListIterator<E>
+
     override fun listIterator(index: Int): MutableListIterator<E>
 
     // View
@@ -235,6 +242,7 @@ public interface MutableList<E> : List<E>, MutableCollection<E> {
 public interface Set<out E> : Collection<E> {
     // Query Operations
     override val size: Int
+
     override fun isEmpty(): Boolean
     override fun contains(element: @UnsafeVariance E): Boolean
     override fun iterator(): Iterator<E>
@@ -254,10 +262,12 @@ public interface MutableSet<E> : Set<E>, MutableCollection<E> {
 
     // Modification Operations
     override fun add(element: E): Boolean
+
     override fun remove(element: E): Boolean
 
     // Bulk Modification Operations
     override fun addAll(elements: Collection<E>): Boolean
+
     override fun removeAll(elements: Collection<E>): Boolean
     override fun retainAll(elements: Collection<E>): Boolean
     override fun clear(): Unit
@@ -312,17 +322,17 @@ public interface Map<K, out V> {
 
     // Views
     /**
-     * Returns a [Set] of all keys in this map.
+     * Returns a read-only [Set] of all keys in this map.
      */
     public val keys: Set<K>
 
     /**
-     * Returns a [Collection] of all values in this map. Note that this collection may contain duplicate values.
+     * Returns a read-only [Collection] of all values in this map. Note that this collection may contain duplicate values.
      */
     public val values: Collection<V>
 
     /**
-     * Returns a [Set] of all key/value pairs in this map.
+     * Returns a read-only [Set] of all key/value pairs in this map.
      */
     public val entries: Set<Map.Entry<K, V>>
 
@@ -388,19 +398,30 @@ public interface MutableMap<K, V> : Map<K, V> {
     public fun clear(): Unit
 
     // Views
+    /**
+     * Returns a mutable [Set] of all keys in this map.
+     */
     override val keys: MutableSet<K>
-    override val values: MutableCollection<V>
+
+    /**
+     * Returns a mutable [Collection] of all values in this map. Note that this collection may contain duplicate values.
+     */
     override val entries: MutableSet<MutableMap.MutableEntry<K, V>>
+
+    /**
+     * Returns a mutable [Set] of all key/value pairs in this map.
+     */
+    override val values: MutableCollection<V>
 
     /**
      * Represents a key/value pair held by a [MutableMap].
      */
-    public interface MutableEntry<K,V>: Map.Entry<K, V> {
+    public interface MutableEntry<K, V> : Map.Entry<K, V> {
         /**
          * Changes the value associated with the key of this entry.
          *
          * @return the previous value corresponding to the key.
          */
-         public fun setValue(newValue: V): V
+        public fun setValue(newValue: V): V
     }
 }
