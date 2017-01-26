@@ -108,7 +108,7 @@ private fun detectPlatformByLibrary(moduleNode: DataNode<ModuleData>): TargetPla
             .firstOrNull { moduleNode.getResolvedKotlinStdlibVersionByModuleData(it.mavenLibraryId) != null }
 }
 
-private fun configureFacetByGradleModule(
+fun configureFacetByGradleModule(
         moduleNode: DataNode<ModuleData>,
         ideModule: Module,
         modelsProvider: IdeModifiableModelsProvider
