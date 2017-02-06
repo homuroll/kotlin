@@ -54,6 +54,10 @@ public abstract class ClassBodyCodegen extends MemberCodegen<KtPureClassOrObject
 
     @Override
     protected void generateBody() {
+        KtElement parent = myClass.getPsiOrParent();
+        boolean onlyGenerateClasses = parent instanceof KtClassOrObject &&
+                    !state.getGenerateDeclaredClassFilter().shouldGenerateClassMembers((KtClassOrObject) parent);
+
         List<KtObjectDeclaration> companions = new ArrayList<KtObjectDeclaration>();
         if (kind != OwnerKind.DEFAULT_IMPLS) {
             //generate nested classes first and only then generate class body. It necessary to access to nested CodegenContexts
@@ -65,7 +69,7 @@ public abstract class ClassBodyCodegen extends MemberCodegen<KtPureClassOrObject
                         CodegenUtilKt.populateCompanionBackingFieldNamesToOuterContextIfNeeded((KtObjectDeclaration) declaration, context, state);
                     }
                     else {
-                        generateDeclaration(declaration);
+                        if (!onlyGenerateClasses || declaration instanceof KtClassOrObject) generateDeclaration(declaration);
                     }
                 }
             }
@@ -73,13 +77,15 @@ public abstract class ClassBodyCodegen extends MemberCodegen<KtPureClassOrObject
 
         for (KtDeclaration declaration : myClass.getDeclarations()) {
             if (!shouldProcessFirst(declaration)) {
-                generateDeclaration(declaration);
+                if (!onlyGenerateClasses) generateDeclaration(declaration);
             }
         }
 
-        generatePrimaryConstructorProperties();
-        generateConstructors();
-        generateDefaultImplsIfNeeded();
+        if (!onlyGenerateClasses) {
+            generatePrimaryConstructorProperties();
+            generateConstructors();
+            generateDefaultImplsIfNeeded();
+        }
 
         // Generate _declared_ companions
         for (KtObjectDeclaration companion : companions) {
@@ -91,6 +97,8 @@ public abstract class ClassBodyCodegen extends MemberCodegen<KtPureClassOrObject
         if (companionObjectDescriptor instanceof SyntheticClassOrObjectDescriptor) {
             genSyntheticClassOrObject((SyntheticClassOrObjectDescriptor) companionObjectDescriptor);
         }
+
+        if (onlyGenerateClasses) return;
 
         if (!DescriptorUtils.isInterface(descriptor)) {
             for (DeclarationDescriptor memberDescriptor : DescriptorUtils.getAllDescriptors(descriptor.getDefaultType().getMemberScope())) {
