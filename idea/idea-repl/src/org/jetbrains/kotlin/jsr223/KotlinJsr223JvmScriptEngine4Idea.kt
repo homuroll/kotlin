@@ -17,11 +17,14 @@
 package org.jetbrains.kotlin.jsr223
 
 import com.intellij.openapi.Disposable
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocation
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.repl.*
 import org.jetbrains.kotlin.daemon.client.DaemonReportMessage
 import org.jetbrains.kotlin.daemon.client.DaemonReportingTargets
 import org.jetbrains.kotlin.daemon.client.KotlinCompilerClient
-import org.jetbrains.kotlin.daemon.client.KotlinRemoteReplCompiler
+import org.jetbrains.kotlin.daemon.client.KotlinRemoteReplClient
 import org.jetbrains.kotlin.daemon.common.*
 import org.jetbrains.kotlin.utils.PathUtil
 import java.io.File
@@ -52,15 +55,19 @@ class KotlinJsr223JvmScriptEngine4Idea(
                 ?: throw ScriptException("Unable to connect to repl server:" + daemonReportMessages.joinToString("\n  ", prefix = "\n  ") { "${it.category.name} ${it.message}" })
     }
 
+    private val messageCollector = MyMessageCollector()
+
     override val replCompiler: ReplCompiler by lazy {
         daemon.let {
-            KotlinRemoteReplCompiler(disposable,
-                                     it,
-                                     makeAutodeletingFlagFile("idea-jsr223-repl-session"),
-                                     CompileService.TargetPlatform.JVM,
-                                     templateClasspath,
-                                     templateClassName,
-                                     System.out)
+            KotlinRemoteReplClient(disposable,
+                                   it,
+                                   makeAutodeletingFlagFile("idea-jsr223-repl-session"),
+                                   CompileService.TargetPlatform.JVM,
+                                   emptyArray(),
+                                   messageCollector,
+                                   templateClasspath,
+                                   templateClassName,
+                                   ScriptArgsWithTypes(emptyArray(), emptyArray()))
         }
     }
 
@@ -70,4 +77,20 @@ class KotlinJsr223JvmScriptEngine4Idea(
     val localEvaluator: ReplFullEvaluator by lazy { GenericReplCompilingEvaluator(replCompiler, templateClasspath, Thread.currentThread().contextClassLoader) }
 
     override val replEvaluator: ReplFullEvaluator get() = localEvaluator
+
+    private class MyMessageCollector : MessageCollector {
+
+        var _hasErrors: Boolean = false
+
+        override fun report(severity: CompilerMessageSeverity, message: String, location: CompilerMessageLocation) {
+            System.err.println(message) // TODO: proper location printing
+            if (!_hasErrors) {
+                _hasErrors = severity == CompilerMessageSeverity.EXCEPTION || severity == CompilerMessageSeverity.ERROR
+            }
+        }
+
+        override fun clear() {}
+
+        override fun hasErrors(): Boolean = _hasErrors
+    }
 }
