@@ -69,7 +69,7 @@ open class GenericReplChecker(
 
     override fun check(state: IReplStageState<*>, codeLine: ReplCodeLine): ReplCheckResult {
         state.lock.write {
-            val checkerState = state.asState<GenericReplCheckerState>()
+            val checkerState = state.asState(GenericReplCheckerState::class.java)
             val scriptFileName = makeScriptBaseName(codeLine, checkerState.generation.get())
             val virtualFile =
                     LightVirtualFile("$scriptFileName${KotlinParserDefinition.STD_SCRIPT_EXT}", KotlinLanguage.INSTANCE, codeLine.code).apply {
