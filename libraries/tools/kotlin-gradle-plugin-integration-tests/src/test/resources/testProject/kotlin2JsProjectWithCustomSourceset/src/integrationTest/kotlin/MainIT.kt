@@ -1,8 +1,10 @@
 package test
 
 import example.MyProductionClass
+import org.junit.Test
 
-class MyTest {
+class MainIT {
+    @Test
     fun mySimpleTest() {
         MyProductionClass().i = 10
     }
