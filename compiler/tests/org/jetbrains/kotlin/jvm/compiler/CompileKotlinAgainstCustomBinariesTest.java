@@ -30,10 +30,12 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.analyzer.AnalysisResult;
 import org.jetbrains.kotlin.cli.AbstractCliTest;
 import org.jetbrains.kotlin.cli.WrongBytecodeVersionTest;
+import org.jetbrains.kotlin.cli.common.CLICompiler;
 import org.jetbrains.kotlin.cli.common.ExitCode;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
+import org.jetbrains.kotlin.cli.js.K2JSCompiler;
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
@@ -87,8 +89,26 @@ public class CompileKotlinAgainstCustomBinariesTest extends TestCaseWithTmpdir {
 
     @NotNull
     private File compileLibrary(@NotNull String sourcePath, @NotNull File... extraClassPath) {
-        File result = new File(tmpdir, sourcePath + ".jar");
-        Pair<String, ExitCode> output = compileKotlin(sourcePath, result, extraClassPath);
+        return compileLibrary(new K2JVMCompiler(), sourcePath, extraClassPath);
+    }
+
+    @NotNull
+    private File compileLibrary(@NotNull CLICompiler<?> compiler, @NotNull String sourcePath, @NotNull File... extraClassPath) {
+        File destination;
+        File result;
+        if (compiler instanceof K2JSCompiler) {
+            destination = new File(tmpdir, sourcePath + ".js");
+            result = new File(tmpdir, sourcePath + ".meta.js");
+        }
+        else if (compiler instanceof K2JVMCompiler) {
+            destination = new File(tmpdir, sourcePath + ".jar");
+            result = destination;
+        }
+        else {
+            throw new UnsupportedOperationException(compiler.toString());
+        }
+
+        Pair<String, ExitCode> output = compileKotlin(compiler, sourcePath, destination, Collections.<String>emptyList(), extraClassPath);
         Assert.assertEquals(normalizeOutput(new Pair<String, ExitCode>("", ExitCode.OK)), normalizeOutput(output));
         return result;
     }
@@ -218,22 +238,49 @@ public class CompileKotlinAgainstCustomBinariesTest extends TestCaseWithTmpdir {
     private Pair<String, ExitCode> compileKotlin(
             @NotNull String fileName,
             @NotNull File output,
-            List<String> additionalOptions,
+            @NotNull List<String> additionalOptions,
+            @NotNull File... classpath
+    ) {
+        return compileKotlin(new K2JVMCompiler(), fileName, output, additionalOptions, classpath);
+    }
+
+    @NotNull
+    private Pair<String, ExitCode> compileKotlin(
+            @NotNull CLICompiler<?> compiler,
+            @NotNull String fileName,
+            @NotNull File output,
+            @NotNull List<String> additionalOptions,
             @NotNull File... classpath
     ) {
         List<String> args = new ArrayList<String>();
         File sourceFile = new File(getTestDataDirectory(), fileName);
         assert sourceFile.exists() : "Source file does not exist: " + sourceFile.getAbsolutePath();
         args.add(sourceFile.getPath());
-        if (classpath.length > 0) {
-            args.add("-classpath");
-            args.add(StringsKt.join(Arrays.asList(classpath), File.pathSeparator));
+
+        if (compiler instanceof K2JSCompiler) {
+            if (classpath.length > 0) {
+                args.add("-libraries");
+                args.add(StringsKt.join(Arrays.asList(classpath), File.pathSeparator));
+            }
+            args.add("-output");
+            args.add(output.getPath());
+            args.add("-meta-info");
         }
-        args.add("-d");
-        args.add(output.getPath());
+        else if (compiler instanceof K2JVMCompiler) {
+            if (classpath.length > 0) {
+                args.add("-classpath");
+                args.add(StringsKt.join(Arrays.asList(classpath), File.pathSeparator));
+            }
+            args.add("-d");
+            args.add(output.getPath());
+        }
+        else {
+            throw new UnsupportedOperationException(compiler.toString());
+        }
+
         args.addAll(additionalOptions);
 
-        return AbstractCliTest.executeCompilerGrabOutput(new K2JVMCompiler(), args);
+        return AbstractCliTest.executeCompilerGrabOutput(compiler, args);
     }
 
     private void doTestBrokenJavaLibrary(@NotNull String libraryName, @NotNull String... pathsToDelete) throws Exception {
@@ -278,13 +325,15 @@ public class CompileKotlinAgainstCustomBinariesTest extends TestCaseWithTmpdir {
     }
 
     @SuppressWarnings("deprecation")
-    private void doTestPreReleaseKotlinLibrary(@NotNull String libraryName, @NotNull String... additionalOptions) throws Exception {
+    private void doTestPreReleaseKotlinLibrary(
+            @NotNull CLICompiler<?> compiler, @NotNull String libraryName, @NotNull String... additionalOptions
+    ) throws Exception {
         // Compiles the library with the "pre-release" flag, then compiles a usage of this library in the release mode
 
         File library;
         try {
             System.setProperty(TEST_IS_PRE_RELEASE_SYSTEM_PROPERTY, "true");
-            library = compileLibrary(libraryName);
+            library = compileLibrary(compiler, libraryName);
         }
         finally {
             System.clearProperty(TEST_IS_PRE_RELEASE_SYSTEM_PROPERTY);
@@ -293,7 +342,7 @@ public class CompileKotlinAgainstCustomBinariesTest extends TestCaseWithTmpdir {
         Pair<String, ExitCode> output;
         try {
             System.setProperty(TEST_IS_PRE_RELEASE_SYSTEM_PROPERTY, "false");
-            output = compileKotlin("source.kt", tmpdir, Arrays.asList(additionalOptions), library);
+            output = compileKotlin(compiler, "source.kt", tmpdir, Arrays.asList(additionalOptions), library);
         }
         finally {
             System.clearProperty(TEST_IS_PRE_RELEASE_SYSTEM_PROPERTY);
@@ -414,7 +463,11 @@ public class CompileKotlinAgainstCustomBinariesTest extends TestCaseWithTmpdir {
     }
 
     public void testReleaseCompilerAgainstPreReleaseLibrary() throws Exception {
-        doTestPreReleaseKotlinLibrary("library");
+        doTestPreReleaseKotlinLibrary(new K2JVMCompiler(), "library");
+    }
+
+    public void testReleaseCompilerAgainstPreReleaseLibraryJs() throws Exception {
+        doTestPreReleaseKotlinLibrary(new K2JSCompiler(), "library");
     }
 
     /*
@@ -422,7 +475,7 @@ public class CompileKotlinAgainstCustomBinariesTest extends TestCaseWithTmpdir {
     // which may cause subsequent tests to behave unexpectedly
     // TODO: refactor and uncomment
     public void testReleaseCompilerAgainstPreReleaseLibrarySkipVersionCheck() throws Exception {
-        doTestPreReleaseKotlinLibrary("library", "-Xskip-metadata-version-check");
+        doTestPreReleaseKotlinLibrary(new K2JVMCompiler(), "library", "-Xskip-metadata-version-check");
     }
     */
 

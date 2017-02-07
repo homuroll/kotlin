@@ -55,7 +55,6 @@ object JvmPlatformConfigurator : PlatformConfigurator(
                 ProtectedInSuperClassCompanionCallChecker(),
                 UnsupportedSyntheticCallableReferenceChecker(),
                 SuperCallWithDefaultArgumentsChecker(),
-                MissingDependencyClassChecker,
                 ProtectedSyntheticExtensionCallChecker,
                 ReifiedTypeParameterSubstitutionChecker(),
                 AdditionalBuiltInsMembersCallChecker
@@ -69,7 +68,6 @@ object JvmPlatformConfigurator : PlatformConfigurator(
         ),
 
         additionalClassifierUsageCheckers = listOf(
-                MissingDependencyClassChecker.ClassifierUsage
         ),
 
         additionalAnnotationCheckers = listOf(

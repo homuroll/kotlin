@@ -17,9 +17,11 @@
 package org.jetbrains.kotlin.serialization.deserialization
 
 import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.descriptors.SourceElement
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.serialization.ProtoBuf
+import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedContainerSource
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedPackageMemberScope
 import org.jetbrains.kotlin.storage.StorageManager
 
@@ -27,15 +29,16 @@ abstract class DeserializedPackageFragmentImpl(
         fqName: FqName,
         storageManager: StorageManager,
         module: ModuleDescriptor,
-        protected val proto: ProtoBuf.PackageFragment
+        protected val proto: ProtoBuf.PackageFragment,
+        private val containerSource: DeserializedContainerSource?
 ) : DeserializedPackageFragment(fqName, storageManager, module) {
     protected val nameResolver = NameResolverImpl(proto.strings, proto.qualifiedNames)
 
-    override val classDataFinder = ProtoBasedClassDataFinder(proto, nameResolver)
+    override val classDataFinder = ProtoBasedClassDataFinder(proto, nameResolver) { containerSource ?: SourceElement.NO_SOURCE }
 
     override fun computeMemberScope() =
             DeserializedPackageMemberScope(
-                    this, proto.`package`, nameResolver, containerSource = null, components = components,
+                    this, proto.`package`, nameResolver, containerSource, components,
                     classNames = { classDataFinder.allClassIds.filterNot(ClassId::isNestedClass).map { it.shortClassName } }
             )
 }
